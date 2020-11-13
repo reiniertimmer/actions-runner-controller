@@ -59,6 +59,8 @@ type RunnerSpec struct {
 
 	// +optional
 	Volumes []corev1.Volume `json:"volumes,omitempty"`
+	// +optional
+	WorkDir string `json:"workDir,omitempty"`
 
 	// +optional
 	InitContainers []corev1.Container `json:"initContainers,omitempty"`
@@ -84,8 +86,6 @@ type RunnerSpec struct {
 	TerminationGracePeriodSeconds *int64 `json:"terminationGracePeriodSeconds,omitempty"`
 	// +optional
 	DockerdWithinRunnerContainer *bool `json:"dockerdWithinRunnerContainer,omitempty"`
-	// +optional
-	WorkDir string `json:"workDir,omitempty"`
 }
 
 // ValidateRepository validates repository field.
