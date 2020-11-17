@@ -37,6 +37,12 @@ There are two ways for actions-runner-controller to authenticate with the GitHub
 1. Using GitHub App.
 2. Using Personal Access Token.
 
+Regardless of which authentication method you use, the same permissions are required, those permissions are:
+- Repository: Administration (read/write)
+- Repository: Actions (read)
+- Organization: Self-hosted runners (read/write)
+
+
 **NOTE: It is extremely important to only follow one of the sections below and not both.**
 
 ### Using GitHub App
@@ -75,11 +81,6 @@ $ kubectl create secret generic controller-manager \
     --from-literal=github_app_installation_id=${INSTALLATION_ID} \
     --from-file=github_app_private_key=${PRIVATE_KEY_FILE_PATH}
 ```
-
-The permissions required are:
-- Repository: Administration (read/write)
-- Repository: Actions (read)
-- Organization: Self-hosted runners (read/write)
 
 ### Using Personal Access Token
 
@@ -235,7 +236,7 @@ spec:
     - summerwind/actions-runner-controller
 ```
 
-Please also note that the sync period is set to 10 minutes by default and it's configurable via `--sync-period` flag.
+The scale out performance is controlled via the manager containers startup `--sync-period` argument. The default value is 10 minutes to prevent unconfigured deployments rate limiting themselves from the GitHub API. The period can be customised in the `config/default/manager_auth_proxy_patch.yaml` patch for those that are building the solution via the kustomize setup.
 
 Additionally, the autoscaling feature has an anti-flapping option that prevents periodic loop of scaling up and down.
 By default, it doesn't scale down until the grace period of 10 minutes passes after a scale up. The grace period can be configured by setting `scaleDownDelaySecondsAfterScaleUp`:
@@ -320,6 +321,8 @@ spec:
         requests:
           cpu: "2.0"
           memory: "4Gi"
+      # If set to false, there are no privileged container and you cannot use docker. 
+      dockerEnabled: false
       # If set to true, runner pod container only 1 container that's expected to be able to run docker, too.
       # image summerwind/actions-runner-dind or custom one should be used with true -value
       dockerdWithinRunnerContainer: false
@@ -435,6 +438,41 @@ spec:
   repository: summerwind/actions-runner-controller
   image: YOUR_CUSTOM_DOCKER_IMAGE
 ```
+
+## Common Errors
+
+### invalid header field value
+
+```json
+2020-11-12T22:17:30.693Z	ERROR	controller-runtime.controller	Reconciler error	{"controller": "runner", "request": "actions-runner-system/runner-deployment-dk7q8-dk5c9", "error": "failed to create registration token: Post \"https://api.github.com/orgs/$YOUR_ORG_HERE/actions/runners/registration-token\": net/http: invalid header field value \"Bearer $YOUR_TOKEN_HERE\\n\" for key Authorization"}
+```
+
+**Solutions**<br />
+Your base64'ed PAT token has a new line at the end, it needs to be created without a `\n` added
+* `echo -n $TOKEN | base64`
+* Create the secret as described in the docs using the shell and documeneted flags
+
+# Developing
+
+If you'd like to modify the controller to fork or contribute, I'd suggest using the following snippet for running
+the acceptance test:
+
+```shell
+NAME=$DOCKER_USER/actions-runner-controller VERSION=dev \
+  GITHUB_TOKEN=*** \
+  APP_ID=*** \
+  PRIVATE_KEY_FILE_PATH=path/to/pem/file \
+  INSTALLATION_ID=*** \
+  make docker-build docker-push acceptance
+```
+
+Please follow the instructions explained in [Using Personal Access Token](#using-personal-access-token) to obtain
+`GITHUB_TOKEN`, and those in [Using GitHub App](#using-github-app) to obtain `APP_ID`, `INSTALLATION_ID`, and
+`PRIAVTE_KEY_FILE_PATH`.
+
+The test creates a one-off `kind` cluster, deploys `cert-manager` and `actions-runner-controller`,
+creates a `RunnerDeployment` custom resource for a public Git repository to confirm that the
+controller is able to bring up a runner pod with the actions runner registration token installed.
 
 # Alternatives
 

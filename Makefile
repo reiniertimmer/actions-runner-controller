@@ -59,10 +59,13 @@ deploy: manifests
 	kustomize build config/default | kubectl apply -f -
 
 # Generate manifests e.g. CRD, RBAC etc.
-manifests: manifests-118 fix118
+manifests: manifests-118 fix118 chart-crds
 
 manifests-118: controller-gen
 	$(CONTROLLER_GEN) $(CRD_OPTIONS) rbac:roleName=manager-role webhook paths="./..." output:crd:artifacts:config=config/crd/bases
+
+chart-crds:
+	cp config/crd/bases/*.yaml charts/actions-runner-controller/crds/
 
 # Run go fmt against code
 fmt:
@@ -117,6 +120,31 @@ release: manifests
 	cd config/manager && kustomize edit set image controller=${NAME}:${VERSION}
 	mkdir -p release
 	kustomize build config/default > release/actions-runner-controller.yaml
+
+.PHONY: acceptance
+acceptance: release
+	ACCEPTANCE_TEST_SECRET_TYPE=token make acceptance/setup acceptance/tests acceptance/teardown
+	ACCEPTANCE_TEST_SECRET_TYPE=app make acceptance/setup acceptance/tests acceptance/teardown
+	ACCEPTANCE_TEST_DEPLOYMENT_TOOL=helm ACCEPTANCE_TEST_SECRET_TYPE=token make acceptance/setup acceptance/tests acceptance/teardown
+	ACCEPTANCE_TEST_DEPLOYMENT_TOOL=helm ACCEPTANCE_TEST_SECRET_TYPE=app make acceptance/setup acceptance/tests acceptance/teardown
+
+acceptance/setup:
+	kind create cluster --name acceptance
+	kubectl cluster-info --context kind-acceptance
+	kubectl apply --validate=false -f https://github.com/jetstack/cert-manager/releases/download/v1.0.4/cert-manager.yaml	#kubectl create namespace actions-runner-system
+	kubectl -n cert-manager wait deploy/cert-manager-cainjector --for condition=available --timeout 60s
+	kubectl -n cert-manager wait deploy/cert-manager-webhook --for condition=available --timeout 60s
+	kubectl -n cert-manager wait deploy/cert-manager --for condition=available --timeout 60s
+	kubectl create namespace actions-runner-system
+	# Adhocly wait for some time until cert-manager's admission webhook gets ready
+	sleep 5
+
+acceptance/teardown:
+	kind delete cluster --name acceptance
+
+acceptance/tests:
+	acceptance/deploy.sh
+	acceptance/checks.sh
 
 # Upload release file to GitHub.
 github-release: release

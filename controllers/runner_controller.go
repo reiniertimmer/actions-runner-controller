@@ -299,6 +299,7 @@ func (r *RunnerReconciler) newPod(runner v1alpha1.Runner) (corev1.Pod, error) {
 	var (
 		privileged      bool = true
 		dockerdInRunner bool = runner.Spec.DockerdWithinRunnerContainer != nil && *runner.Spec.DockerdWithinRunnerContainer
+		dockerEnabled   bool = runner.Spec.DockerEnabled == nil || *runner.Spec.DockerEnabled
 	)
 
 	runnerImage := runner.Spec.Image
@@ -382,16 +383,10 @@ func (r *RunnerReconciler) newPod(runner v1alpha1.Runner) (corev1.Pod, error) {
 		},
 	}
 
-	if !dockerdInRunner {
+	if !dockerdInRunner && dockerEnabled {
 		pod.Spec.Volumes = []corev1.Volume{
 			{
 				Name: "work",
-				VolumeSource: corev1.VolumeSource{
-					EmptyDir: &corev1.EmptyDirVolumeSource{},
-				},
-			},
-			{
-				Name: "docker",
 				VolumeSource: corev1.VolumeSource{
 					EmptyDir: &corev1.EmptyDirVolumeSource{},
 				},
@@ -407,6 +402,10 @@ func (r *RunnerReconciler) newPod(runner v1alpha1.Runner) (corev1.Pod, error) {
 				MountPath: "/var/run",
 			},
 		}
+		pod.Spec.Containers[0].Env = append(pod.Spec.Containers[0].Env, corev1.EnvVar{
+			Name:  "DOCKER_HOST",
+			Value: "tcp://localhost:2375",
+		})
 		pod.Spec.Containers = append(pod.Spec.Containers, corev1.Container{
 			Name:  "docker",
 			Image: r.DockerImage,
@@ -415,9 +414,11 @@ func (r *RunnerReconciler) newPod(runner v1alpha1.Runner) (corev1.Pod, error) {
 					Name:      "work",
 					MountPath: workDir,
 				},
+			},
+			Env: []corev1.EnvVar{
 				{
-					Name:      "docker",
-					MountPath: "/var/run",
+					Name:  "DOCKER_TLS_CERTDIR",
+					Value: "",
 				},
 			},
 			SecurityContext: &corev1.SecurityContext{
