@@ -3,7 +3,7 @@ name: Validate workdirs
 jobs:
   build:
     runs-on: ${{ matrix.runs-on }}
-    name: Build ${{ matrix.name }}
+    name: Build ${{ matrix.runs-on }}
     strategy:
       matrix:
         include:
@@ -18,5 +18,9 @@ jobs:
     steps:
       - name: Check working directory
         run: |
-          env
-          [ "$PWD" == "${{ matrix.work-dir }}" ]
+          if [ "$PWD" == "${{ matrix.work-dir }}" ]
+          then
+            echo "PWD $PWD equals ${{ matrix.work-dir }}"
+          else
+            echo "PWD $PWD not equal to work dir ${{ matrix.work-dir }}"
+          fi
