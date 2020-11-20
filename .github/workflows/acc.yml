@@ -18,9 +18,4 @@ jobs:
     steps:
       - name: Check working directory
         run: |
-          if [ "$RUNNER_WORKSPACE" == "${{ matrix.work-dir }}/${{ github.event.repository.name }}" ]
-          then
-            echo "WS $RUNNER_WORKSPACE equals ${{ matrix.work-dir }}/${{ github.event.repository.name }}"
-          else
-            echo "WS $RUNNER_WORKSPACE does not equal ${{ matrix.work-dir }}/${{ github.event.repository.name }}"
-          fi
+          [ "$RUNNER_WORKSPACE" == "${{ matrix.work-dir }}/${{ github.event.repository.name }}" ]
