@@ -1,0 +1,22 @@
+on: push
+name: Validate workdirs
+jobs:
+  build:
+    runs-on: ${{ matrix.runs-on }}
+    name: Build ${{ matrix.name }}
+    strategy:
+      matrix:
+        include:
+          - runs-on: dind
+            work-dir: /runner/_work
+          - runs-on: dind-wd
+            work-dir: /home/runner/work
+          - runs-on: normal
+            work-dir: /runner/_work
+          - runs-on: normal-wd
+            work-dir: /home/runner/work
+    steps:
+      - name: Check working directory
+        run: |
+          env
+          [ "$PWD" == "${{ matrix.work-dir }}" ]
