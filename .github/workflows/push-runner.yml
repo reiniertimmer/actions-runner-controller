@@ -1,0 +1,50 @@
+on:
+  push:
+    branches-ignore:
+      - master
+    paths:
+      - runner/patched/*
+      - runner/Dockerfile
+      - runner/dindrunner.Dockerfile
+      - runner/entrypoint.sh
+      - .github/workflows/build-runner.yml
+name: Runner
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    name: Build ${{ matrix.name }}
+    strategy:
+      matrix:
+        include:
+          - name: actions-runner
+            dockerfile: Dockerfile
+          - name: actions-runner-dind
+            dockerfile: dindrunner.Dockerfile
+    env:
+      RUNNER_VERSION: 2.274.2
+      DOCKER_VERSION: 19.03.12
+      DOCKERHUB_USERNAME: ${{ secrets.DOCKER_HUB_USER }}
+      DOCKERHUB_PASSWORD: ${{ secrets.DOCKER_HUB_PASS }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Set up Docker Buildx
+        id: buildx
+        uses: crazy-max/ghaction-docker-buildx@v1
+        with:
+          buildx-version: latest
+
+      - name: Login to GitHub Docker Registry
+        run: echo "${DOCKERHUB_PASSWORD}" | docker login -u "${DOCKERHUB_USERNAME}" --password-stdin
+
+      - name: Build and Push Container Image
+        working-directory: runner
+        run: |
+          docker buildx build \
+            --build-arg RUNNER_VERSION=${RUNNER_VERSION} \
+            --build-arg DOCKER_VERSION=${DOCKER_VERSION} \
+            --platform linux/amd64,linux/arm64 \
+            --tag ${DOCKERHUB_USERNAME}/${{ matrix.name }}:v${RUNNER_VERSION} \
+            --tag ${DOCKERHUB_USERNAME}/${{ matrix.name }}:latest \
+            -f ${{ matrix.dockerfile }} . --push
