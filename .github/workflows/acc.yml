@@ -3,7 +3,7 @@ name: Validate workdirs
 jobs:
   build:
     runs-on: ${{ matrix.runs-on }}
-    name: Build ${{ matrix.runs-on }}
+    name: ${{ matrix.runs-on }}
     strategy:
       matrix:
         include:
@@ -18,9 +18,9 @@ jobs:
     steps:
       - name: Check working directory
         run: |
-          if [ "$PWD" == "${{ matrix.work-dir }}" ]
+          if [ "$RUNNER_WORKSPACE" == "${{ matrix.work-dir }}/${{ github.event.repository.name }}" ]
           then
-            echo "PWD $PWD equals ${{ matrix.work-dir }}"
+            echo "WS $RUNNER_WORKSPACE equals ${{ matrix.work-dir }}/${{ github.event.repository.name }}"
           else
-            echo "PWD $PWD not equal to work dir ${{ matrix.work-dir }}"
+            echo "WS $RUNNER_WORKSPACE does not equal ${{ matrix.work-dir }}/${{ github.event.repository.name }}"
           fi
